@@ -10,10 +10,10 @@ import { Car, Lock, CreditCard, CheckCircle, ArrowRight, Phone, HelpCircle, Home
 
 export default function PaymentPortal() {
   const [formData, setFormData] = useState({
-    ticketNo: '',
-    vrm: '',
+    pcnNumber: '',
+    vehicleRegistration: '',
     email: '',
-    previousOutstandingAmount: 60
+    penaltyAmount: 90
   });
   
   // Extract URL parameters on component mount
@@ -27,9 +27,9 @@ export default function PaymentPortal() {
     if (pcnNumber || vehicleReg || amount || email) {
       setFormData(prev => ({
         ...prev,
-        ...(pcnNumber && { ticketNo: pcnNumber }),
-        ...(vehicleReg && { vrm: vehicleReg.toUpperCase() }),
-        ...(amount && { previousOutstandingAmount: parseFloat(amount) || 60 }),
+        ...(pcnNumber && { pcnNumber }),
+        ...(vehicleReg && { vehicleRegistration: vehicleReg.toUpperCase() }),
+        ...(amount && { penaltyAmount: parseFloat(amount) || 90 }),
         ...(email && { email })
       }));
     }
@@ -41,9 +41,9 @@ export default function PaymentPortal() {
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: field === 'vrm' 
+      [field]: field === 'vehicleRegistration' 
         ? value.toUpperCase().replace(/[^A-Z0-9]/g, '') 
-        : field === 'previousOutstandingAmount' 
+        : field === 'penaltyAmount' 
         ? parseFloat(value) || 0
         : value
     }));
@@ -52,10 +52,10 @@ export default function PaymentPortal() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0) {
+    if (!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0) {
       toast({
         title: "Validation Error",
-        description: "Please fill in ticket number, vehicle registration and penalty amount",
+        description: "Please fill in PCN number, vehicle registration and penalty amount",
         variant: "destructive",
       });
       return;
@@ -63,9 +63,9 @@ export default function PaymentPortal() {
 
     // Open payment popup with URL parameters
     const params = new URLSearchParams({
-      pcn: formData.ticketNo,
-      vehicle: formData.vrm,
-      amount: formData.previousOutstandingAmount.toString()
+      pcn: formData.pcnNumber,
+      vehicle: formData.vehicleRegistration,
+      amount: formData.penaltyAmount.toString()
     });
     
     const popupUrl = `/payment?${params.toString()}`;
@@ -149,7 +149,7 @@ export default function PaymentPortal() {
             </div>
             <Button 
               onClick={handleFormSubmit}
-              disabled={!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0}
+              disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
               className="bg-green-500 hover:bg-green-600 text-white px-6 py-2"
             >
               Pay Now
@@ -164,71 +164,90 @@ export default function PaymentPortal() {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h2 className="text-2xl font-medium text-gray-900 mb-4">
-                Pay Your Parking Charge Notice Online
+              <h2 className="text-2xl font-medium text-gray-900 mb-2">
+                Appeal or Pay Your Parking Charge Notice Online
               </h2>
-              <p className="text-gray-600 mb-6">
-                Please check the details below are correct:
+              <p className="text-gray-600 mb-8">
+                Enter your details and choose an option below to proceed
               </p>
 
-              {/* PCN Details Section */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-8">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parking Charge Notice Reference:
-                    </Label>
-                    <Input
-                      data-testid="input-ticket-no"
-                      type="text"
-                      placeholder="Enter PCN reference"
-                      value={formData.ticketNo}
-                      onChange={(e) => handleInputChange('ticketNo', e.target.value)}
-                      className="w-full"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vehicle Registration:
-                    </Label>
-                    <Input
-                      data-testid="input-vrm"
-                      type="text"
-                      placeholder="Enter vehicle registration"
-                      value={formData.vrm}
-                      onChange={(e) => handleInputChange('vrm', e.target.value)}
-                      className="w-full"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Charge Amount (£):
-                    </Label>
-                    <Input
-                      data-testid="input-previous-outstanding-amount"
-                      type="number"
-                      placeholder="60"
-                      value={formData.previousOutstandingAmount}
-                      onChange={(e) => handleInputChange('previousOutstandingAmount', e.target.value)}
-                      className="w-full max-w-xs"
-                      min="1"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">Date Issued:</span>
-                    <p className="text-lg font-semibold text-gray-900">21/08/2025 03:05:09</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="text-sm font-medium text-gray-700">Reason for Issue:</span>
-                    <p className="text-lg font-semibold text-gray-900">No Valid Parking Payment Found</p>
-                  </div>
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-2">
+                    Parking Charge Number
+                  </Label>
+                  <Input
+                    data-testid="input-pcn-number"
+                    type="text"
+                    placeholder="Enter your parking charge number"
+                    value={formData.pcnNumber}
+                    onChange={(e) => handleInputChange('pcnNumber', e.target.value)}
+                    className="w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vehicle Registration
+                  </Label>
+                  <Input
+                    data-testid="input-vehicle-registration"
+                    type="text"
+                    placeholder="Enter your vehicle registration"
+                    value={formData.vehicleRegistration}
+                    onChange={(e) => handleInputChange('vehicleRegistration', e.target.value)}
+                    className="w-full"
+                    required
+                  />
                 </div>
               </div>
 
+
+
+              <div className="mb-8">
+                <Label className="block text-sm font-medium text-gray-700 mb-2">
+                  Penalty Amount (£)
+                </Label>
+                <Input
+                  data-testid="input-penalty-amount"
+                  type="number"
+                  placeholder="90"
+                  value={formData.penaltyAmount}
+                  onChange={(e) => handleInputChange('penaltyAmount', e.target.value)}
+                  className="w-full max-w-xs"
+                  min="1"
+                  step="0.01"
+                  required
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <Button 
+                  data-testid="button-appeal"
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Appeal
+                </Button>
+                <Button 
+                  data-testid="button-transfer"
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Transfer of Liability
+                </Button>
+                <Button 
+                  data-testid="button-pay-online"
+                  onClick={handleFormSubmit}
+                  disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Pay Online
+                </Button>
+              </div>
 
 
 
@@ -237,7 +256,7 @@ export default function PaymentPortal() {
                 <Button 
                   data-testid="button-pay-installments"
                   type="submit" 
-                  disabled={!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0}
+                  disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
                   className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-medium"
                 >
                   Pay in Instalments
@@ -274,20 +293,20 @@ export default function PaymentPortal() {
                   <div className="space-y-2 text-sm text-blue-800">
                     <div className="flex justify-between">
                       <span>Payment 1 (Today):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment 2 ({payment2}):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment 3 ({payment3}):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <hr className="border-blue-200" />
                     <div className="flex justify-between font-medium">
                       <span>Total:</span>
-                      <span>£{formData.previousOutstandingAmount.toFixed(2)}</span>
+                      <span>£{formData.penaltyAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
