@@ -52,29 +52,14 @@ export default function PaymentPortal() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in ticket number, vehicle registration and penalty amount",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Open payment popup with URL parameters
-    const params = new URLSearchParams({
-      pcn: formData.ticketNo,
-      vehicle: formData.vrm,
-      amount: formData.previousOutstandingAmount.toString()
-    });
-    
-    const popupUrl = `/payment?${params.toString()}`;
+    // Always open the penalty search popup - no validation required
+    const popupUrl = `/penalty-search`;
     
     // Open popup window
     const popup = window.open(
       popupUrl,
-      'payment-popup',
-      'width=600,height=700,scrollbars=yes,resizable=yes,status=yes'
+      'penalty-search-popup',
+      'width=800,height=800,scrollbars=yes,resizable=yes,status=yes'
     );
     
     if (!popup) {
@@ -149,10 +134,9 @@ export default function PaymentPortal() {
             </div>
             <Button 
               onClick={handleFormSubmit}
-              disabled={!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0}
-              className="bg-green-500 hover:bg-green-600 text-white px-6 py-2"
+              className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg font-semibold"
             >
-              Pay Now
+              Pay in Instalments
             </Button>
           </div>
         </div>
@@ -164,69 +148,21 @@ export default function PaymentPortal() {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg p-8 shadow-sm">
-              <h2 className="text-2xl font-medium text-gray-900 mb-4">
-                Pay Your Parking Charge Notice Online
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Please check the details below are correct:
-              </p>
-
-              {/* PCN Details Section */}
-              <div className="bg-gray-50 rounded-lg p-6 mb-8">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Parking Charge Notice Reference:
-                    </Label>
-                    <Input
-                      data-testid="input-ticket-no"
-                      type="text"
-                      placeholder="Enter PCN reference"
-                      value={formData.ticketNo}
-                      onChange={(e) => handleInputChange('ticketNo', e.target.value)}
-                      className="w-full"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vehicle Registration:
-                    </Label>
-                    <Input
-                      data-testid="input-vrm"
-                      type="text"
-                      placeholder="Enter vehicle registration"
-                      value={formData.vrm}
-                      onChange={(e) => handleInputChange('vrm', e.target.value)}
-                      className="w-full"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label className="block text-sm font-medium text-gray-700 mb-2">
-                      Charge Amount (£):
-                    </Label>
-                    <Input
-                      data-testid="input-previous-outstanding-amount"
-                      type="number"
-                      placeholder="60"
-                      value={formData.previousOutstandingAmount}
-                      onChange={(e) => handleInputChange('previousOutstandingAmount', e.target.value)}
-                      className="w-full max-w-xs"
-                      min="1"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">Date Issued:</span>
-                    <p className="text-lg font-semibold text-gray-900">21/08/2025 03:05:09</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <span className="text-sm font-medium text-gray-700">Reason for Issue:</span>
-                    <p className="text-lg font-semibold text-gray-900">No Valid Parking Payment Found</p>
-                  </div>
-                </div>
+              {/* External Appeal/Payment Form */}
+              <div className="mb-8">
+                <iframe 
+                  id="zp-widget" 
+                  src="https://civilparking.zatappeal.com/" 
+                  frameBorder="0" 
+                  width="100%" 
+                  style={{
+                    width: '100%',
+                    height: '900px',
+                    border: '1px solid #efefef',
+                    position: 'relative'
+                  }}
+                  title="Appeal or Pay Your Parking Charge Notice"
+                />
               </div>
 
 
@@ -237,8 +173,7 @@ export default function PaymentPortal() {
                 <Button 
                   data-testid="button-pay-installments"
                   type="submit" 
-                  disabled={!formData.ticketNo || !formData.vrm || !formData.previousOutstandingAmount || formData.previousOutstandingAmount <= 0}
-                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-medium"
+                  className="bg-green-500 hover:bg-green-600 text-white px-12 py-4 text-xl font-bold w-full max-w-md mx-auto"
                 >
                   Pay in Instalments
                 </Button>
