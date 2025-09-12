@@ -44,6 +44,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Either ticketNo or vrm is required" });
       }
 
+      // Check if Azure Storage is available
+      if (!azureStorage.isStorageAvailable()) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file storage service is currently unavailable. Please try again later or contact support.'
+        });
+      }
+
       // Search directly from Excel file in Azure Storage
       const penalties = await azureStorage.searchPenaltiesFromExcel(
         'CPO Test Data.xlsx',
@@ -54,6 +62,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(penalties);
     } catch (error) {
       console.error('Search penalties error:', error);
+      // Check for Azure Storage unavailable error
+      if (error instanceof Error && error.message.includes('Azure Storage is not available')) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file storage service is currently unavailable. Please try again later or contact support.'
+        });
+      }
       // Check for Azure BlobNotFound error specifically
       if (error instanceof Error && 
           (error.message.includes('BlobNotFound') || 
@@ -79,6 +94,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      // Check if Azure Storage is available
+      if (!azureStorage.isStorageAvailable()) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file upload service is currently unavailable. Please try again later or contact support.'
+        });
+      }
+
       // Generate unique filename
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = `penalties-${timestamp}.xlsx`;
@@ -101,6 +124,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('File upload error:', error);
+      // Check for Azure Storage unavailable error
+      if (error instanceof Error && error.message.includes('Azure Storage is not available')) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file upload service is currently unavailable. Please try again later or contact support.'
+        });
+      }
       res.status(500).json({ 
         error: 'Failed to upload and process file',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -111,6 +141,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Process existing files in Azure Blob Storage
   app.post("/api/process-files", async (req, res) => {
     try {
+      // Check if Azure Storage is available
+      if (!azureStorage.isStorageAvailable()) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file processing service is currently unavailable. Please try again later or contact support.'
+        });
+      }
+
       const result = await azureStorage.checkAndProcessNewFiles();
       res.json({
         message: 'Files processed successfully',
@@ -118,6 +156,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('File processing error:', error);
+      // Check for Azure Storage unavailable error
+      if (error instanceof Error && error.message.includes('Azure Storage is not available')) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file processing service is currently unavailable. Please try again later or contact support.'
+        });
+      }
       res.status(500).json({ 
         error: 'Failed to process files',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -128,10 +173,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // List files in Azure Blob Storage
   app.get("/api/files", async (req, res) => {
     try {
+      // Check if Azure Storage is available
+      if (!azureStorage.isStorageAvailable()) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file listing service is currently unavailable. Please try again later or contact support.',
+          files: []
+        });
+      }
+
       const files = await azureStorage.listFiles();
       res.json({ files });
     } catch (error) {
       console.error('List files error:', error);
+      // Check for Azure Storage unavailable error
+      if (error instanceof Error && error.message.includes('Azure Storage is not available')) {
+        return res.status(503).json({ 
+          error: 'Azure Storage service unavailable',
+          details: 'The file listing service is currently unavailable. Please try again later or contact support.',
+          files: []
+        });
+      }
       res.status(500).json({ 
         error: 'Failed to list files',
         details: error instanceof Error ? error.message : 'Unknown error'
@@ -230,31 +292,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find or create penalty record in database from Excel data
       let penalty = await storage.getPenaltyByTicketNo(pcnNumber);
       if (!penalty) {
-        // Create penalty record from Excel search data
-        try {
-          const excelPenalties = await azureStorage.searchPenaltiesFromExcel(
-            'CPO Test Data.xlsx',
-            pcnNumber,
-            undefined
-          );
-          
-          if (excelPenalties.length > 0) {
-            const excelPenalty = excelPenalties[0];
-            penalty = await storage.createPenalty({
-              ticketNo: excelPenalty.ticketNo,
-              vrm: excelPenalty.vrm,
-              vehicleMake: excelPenalty.vehicleMake,
-              penaltyAmount: excelPenalty.penaltyAmount,
-              dateIssued: excelPenalty.dateIssued ? new Date(excelPenalty.dateIssued) : new Date(),
-              site: excelPenalty.site,
-              reasonForIssue: excelPenalty.reasonForIssue,
-              badgeId: excelPenalty.badgeId,
-              status: 'active'
-            });
+        // Create penalty record from Excel search data if Azure Storage is available
+        if (azureStorage.isStorageAvailable()) {
+          try {
+            const excelPenalties = await azureStorage.searchPenaltiesFromExcel(
+              'CPO Test Data.xlsx',
+              pcnNumber,
+              undefined
+            );
+            
+            if (excelPenalties.length > 0) {
+              const excelPenalty = excelPenalties[0];
+              penalty = await storage.createPenalty({
+                ticketNo: excelPenalty.ticketNo,
+                vrm: excelPenalty.vrm,
+                vehicleMake: excelPenalty.vehicleMake,
+                penaltyAmount: excelPenalty.penaltyAmount,
+                dateIssued: excelPenalty.dateIssued ? new Date(excelPenalty.dateIssued) : new Date(),
+                site: excelPenalty.site,
+                reasonForIssue: excelPenalty.reasonForIssue,
+                badgeId: excelPenalty.badgeId,
+                status: 'active'
+              });
+            }
+          } catch (error) {
+            console.error('Failed to create penalty from Excel data:', error);
+            // Fall through to create minimal penalty record
           }
-        } catch (error) {
-          console.error('Failed to create penalty from Excel data:', error);
-          // Create minimal penalty record if Excel lookup fails
+        } else {
+          console.warn('Azure Storage unavailable - cannot lookup penalty details from Excel file');
+        }
+        
+        // Create minimal penalty record if Excel lookup fails or Azure Storage is unavailable
+        if (!penalty) {
           penalty = await storage.createPenalty({
             ticketNo: pcnNumber,
             vrm: vehicleRegistration,

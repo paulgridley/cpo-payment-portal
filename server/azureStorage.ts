@@ -8,28 +8,53 @@ const STORAGE_ACCOUNT_NAME = 'parkingchargenotices';
 const STORAGE_CONTAINER_NAME = 'cpo';
 
 export class AzureStorageService {
-  private blobServiceClient: BlobServiceClient;
-  private containerClient: ContainerClient;
+  private blobServiceClient?: BlobServiceClient;
+  private containerClient?: ContainerClient;
+  private isAvailable: boolean = false;
 
   constructor(connectionString?: string) {
-    if (connectionString) {
-      this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
-    } else {
-      // Use Azure credentials for authentication (requires AZURE_STORAGE_CONNECTION_STRING env var)
-      const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
-      if (!connStr) {
-        throw new Error('AZURE_STORAGE_CONNECTION_STRING environment variable is required');
+    try {
+      if (connectionString) {
+        this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+        this.isAvailable = true;
+      } else {
+        // Use Azure credentials for authentication (requires AZURE_STORAGE_CONNECTION_STRING env var)
+        const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connStr) {
+          console.warn('AZURE_STORAGE_CONNECTION_STRING environment variable not found. Azure Storage will be unavailable.');
+          this.isAvailable = false;
+          return;
+        }
+        this.blobServiceClient = BlobServiceClient.fromConnectionString(connStr);
+        this.isAvailable = true;
       }
-      this.blobServiceClient = BlobServiceClient.fromConnectionString(connStr);
+      
+      if (this.blobServiceClient) {
+        this.containerClient = this.blobServiceClient.getContainerClient(STORAGE_CONTAINER_NAME);
+        this.ensureContainerExists();
+      }
+    } catch (error) {
+      console.error('Failed to initialize Azure Storage service:', error);
+      this.isAvailable = false;
     }
-    
-    this.containerClient = this.blobServiceClient.getContainerClient(STORAGE_CONTAINER_NAME);
-    this.ensureContainerExists();
+  }
+
+  // Check if Azure Storage is available
+  public isStorageAvailable(): boolean {
+    return this.isAvailable;
+  }
+
+  // Helper method to throw storage unavailable error
+  private throwStorageUnavailableError(): never {
+    throw new Error('Azure Storage is not available. Please check your AZURE_STORAGE_CONNECTION_STRING environment variable.');
   }
 
   // Ensure the container exists
   private async ensureContainerExists(): Promise<void> {
     try {
+      if (!this.containerClient) {
+        throw new Error('Container client not initialized');
+      }
       await this.containerClient.createIfNotExists();
       console.log(`Azure container '${STORAGE_CONTAINER_NAME}' ensured to exist`);
     } catch (error) {
@@ -40,6 +65,10 @@ export class AzureStorageService {
 
   // Upload a file to Azure Blob Storage
   async uploadFile(fileName: string, buffer: Buffer, contentType?: string): Promise<string> {
+    if (!this.isAvailable || !this.containerClient) {
+      this.throwStorageUnavailableError();
+    }
+    
     try {
       // Sanitize filename to prevent path traversal
       const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -60,6 +89,10 @@ export class AzureStorageService {
 
   // Download a file from Azure Blob Storage
   async downloadFile(fileName: string): Promise<Buffer> {
+    if (!this.isAvailable || !this.containerClient) {
+      this.throwStorageUnavailableError();
+    }
+    
     const blockBlobClient = this.containerClient.getBlockBlobClient(fileName);
     const downloadResponse = await blockBlobClient.download(0);
     
@@ -81,6 +114,10 @@ export class AzureStorageService {
 
   // List files in the container
   async listFiles(): Promise<string[]> {
+    if (!this.isAvailable || !this.containerClient) {
+      this.throwStorageUnavailableError();
+    }
+    
     const fileNames: string[] = [];
     for await (const blob of this.containerClient.listBlobsFlat()) {
       fileNames.push(blob.name);
