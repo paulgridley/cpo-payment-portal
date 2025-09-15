@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { Lock, CreditCard, Search, ArrowRight, X } from "lucide-react";
+import { Lock, CreditCard, Search, ArrowRight, X, AlertTriangle, RefreshCw } from "lucide-react";
 
 interface PenaltyData {
   id: string;
@@ -33,23 +33,190 @@ export default function PenaltySearchPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const { toast } = useToast();
 
-  // Search penalties query
-  const { data: searchResults, refetch: searchPenalties, isFetching } = useQuery({
+  // Enhanced search penalties query with comprehensive error handling
+  const { data: searchResults, refetch: searchPenalties, isFetching, error, isError } = useQuery({
     queryKey: ['/api/search-penalties', searchData.ticketNo, searchData.vrm],
     queryFn: async () => {
-      if (!searchData.ticketNo && !searchData.vrm) return [];
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🔍 Search Debug: Starting search request', {
+          ticketNo: searchData.ticketNo ? `${searchData.ticketNo.substring(0, 3)}***` : '',
+          vrm: searchData.vrm ? `${searchData.vrm.substring(0, 2)}***` : '',
+          timestamp: new Date().toISOString(),
+          environment: import.meta.env.MODE
+        });
+      }
+
+      if (!searchData.ticketNo && !searchData.vrm) {
+        if (import.meta.env.MODE !== 'production') {
+          console.log('🔍 Search Debug: No search criteria provided');
+        }
+        return [];
+      }
+
       const params = new URLSearchParams();
       if (searchData.ticketNo) params.append('ticketNo', searchData.ticketNo);
       if (searchData.vrm) params.append('vrm', searchData.vrm);
       
-      const response = await apiRequest('GET', `/api/search-penalties?${params.toString()}`);
-      if (!response.ok) throw new Error('Search failed');
-      return response.json() as Promise<PenaltyData[]>;
+      const requestUrl = `/api/search-penalties?${params.toString()}`;
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🔍 Search Debug: Making API request to:', requestUrl);
+      }
+
+      try {
+        const response = await apiRequest('GET', requestUrl);
+        
+        if (import.meta.env.MODE !== 'production') {
+          console.log('🔍 Search Debug: API response received', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url
+          });
+        }
+
+        if (!response.ok) {
+          let errorMessage = 'Search failed';
+          let errorDetails = '';
+
+          // Handle specific HTTP error codes
+          if (response.status === 502) {
+            errorMessage = 'Service temporarily unavailable';
+            errorDetails = 'The application is temporarily unavailable. This is usually resolved quickly. Please try again in a moment.';
+          } else if (response.status === 503) {
+            errorMessage = 'Search service temporarily unavailable';
+            errorDetails = 'The penalty search service is currently experiencing issues. Please try again in a few minutes.';
+          } else if (response.status === 404) {
+            errorMessage = 'Search service not found';
+            errorDetails = 'Unable to connect to the penalty search service. Please contact support if this issue persists.';
+          } else if (response.status === 500) {
+            errorMessage = 'Internal server error';
+            errorDetails = 'The server encountered an error while processing your search. Please try again.';
+          } else if (response.status >= 400 && response.status < 500) {
+            errorMessage = 'Invalid search request';
+            errorDetails = 'There was an issue with your search request. Please check your details and try again.';
+          } else {
+            errorMessage = `Search failed (${response.status})`;
+            errorDetails = 'An unexpected error occurred while searching for penalties.';
+          }
+
+          // Try to get error details from response body
+          try {
+            const errorBody = await response.json();
+            if (errorBody.error) {
+              errorDetails = errorBody.error;
+            }
+            if (errorBody.details) {
+              errorDetails = errorBody.details;
+            }
+            if (import.meta.env.MODE !== 'production') {
+              console.log('🔍 Search Debug: Error response body:', errorBody);
+            }
+          } catch (parseError) {
+            if (import.meta.env.MODE !== 'production') {
+              console.log('🔍 Search Debug: Could not parse error response body');
+            }
+          }
+
+          const error = new Error(errorMessage);
+          (error as any).details = errorDetails;
+          (error as any).status = response.status;
+          throw error;
+        }
+
+        const data = await response.json() as PenaltyData[];
+        if (import.meta.env.MODE !== 'production') {
+          console.log('🔍 Search Debug: Search completed successfully', {
+            resultsCount: data.length,
+            results: data.map(r => ({ ...r, ticketNo: `${r.ticketNo.substring(0, 3)}***`, vrm: `${r.vrm.substring(0, 2)}***` }))
+          });
+        }
+
+        return data;
+      } catch (networkError: any) {
+        if (import.meta.env.MODE !== 'production') {
+          console.error('🔍 Search Debug: Network or parsing error:', networkError);
+        }
+        
+        // Handle network connectivity issues
+        if (networkError.name === 'TypeError' && networkError.message.includes('fetch')) {
+          const error = new Error('Network connection failed');
+          (error as any).details = 'Unable to connect to the server. Please check your internet connection and try again.';
+          throw error;
+        }
+        
+        // Re-throw API errors with preserved details
+        throw networkError;
+      }
     },
     enabled: false,
+    retry: (failureCount, error: any) => {
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🔍 Search Debug: Retry attempt', { failureCount, error: error.message });
+      }
+      
+      // Don't retry on client errors (4xx) or service unavailable specifically
+      if (error.status >= 400 && error.status < 500) {
+        return false;
+      }
+      
+      // Retry up to 2 times for server errors and network issues
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
+
+  // Handle search query state changes for error/success feedback
+  useEffect(() => {
+    if (isError && error) {
+      if (import.meta.env.MODE !== 'production') {
+        console.error('🔍 Search Debug: Query error handler triggered:', error);
+      }
+      
+      let errorMessage = 'Search failed';
+      let errorDetails = 'An unexpected error occurred while searching for penalties.';
+      
+      if ((error as any).message && (error as any).details) {
+        errorMessage = (error as any).message;
+        errorDetails = (error as any).details;
+      } else if ((error as any).message) {
+        errorMessage = (error as any).message;
+        if ((error as any).message.includes('Network connection failed')) {
+          errorDetails = 'Please check your internet connection and try again.';
+        } else if ((error as any).message.includes('service temporarily unavailable')) {
+          errorDetails = 'The penalty search service is currently experiencing issues. Please try again in a few minutes.';
+        }
+      }
+
+      setSearchError(errorDetails);
+      
+      toast({
+        title: errorMessage,
+        description: errorDetails,
+        variant: "destructive",
+      });
+    }
+  }, [isError, error, toast]);
+
+  useEffect(() => {
+    if (searchResults && !isError && !isFetching) {
+      if (import.meta.env.MODE !== 'production') {
+        console.log('🔍 Search Debug: Query success handler triggered:', { resultsCount: searchResults.length });
+      }
+      setSearchError(null);
+      setHasSearched(true);
+      
+      if (searchResults.length === 0) {
+        toast({
+          title: "No Results Found",
+          description: "No penalties found matching your search criteria. Please check your details and try again.",
+          variant: "default",
+        });
+      }
+    }
+  }, [searchResults, isError, isFetching, toast]);
 
   const handleSearch = () => {
     if (!searchData.ticketNo && !searchData.vrm) {
@@ -60,6 +227,29 @@ export default function PenaltySearchPage() {
       });
       return;
     }
+    
+    if (import.meta.env.MODE !== 'production') {
+      console.log('🔍 Search Debug: User initiated search', {
+        ticketNo: searchData.ticketNo ? `${searchData.ticketNo.substring(0, 3)}***` : '',
+        vrm: searchData.vrm ? `${searchData.vrm.substring(0, 2)}***` : '',
+        userAgent: navigator.userAgent,
+        currentUrl: window.location.href
+      });
+    }
+    
+    // Clear previous errors and reset state
+    setSearchError(null);
+    setHasSearched(false);
+    
+    // Trigger the search
+    searchPenalties();
+  };
+
+  const handleRetrySearch = () => {
+    if (import.meta.env.MODE !== 'production') {
+      console.log('🔍 Search Debug: User initiated retry search');
+    }
+    setSearchError(null);
     searchPenalties();
   };
 
@@ -170,6 +360,7 @@ export default function PenaltySearchPage() {
                       value={searchData.ticketNo}
                       onChange={(e) => setSearchData(prev => ({ ...prev, ticketNo: e.target.value }))}
                       className="w-full"
+                      data-testid="input-ticketNo"
                     />
                   </div>
                   
@@ -184,6 +375,7 @@ export default function PenaltySearchPage() {
                       value={searchData.vrm}
                       onChange={(e) => setSearchData(prev => ({ ...prev, vrm: e.target.value.toUpperCase() }))}
                       className="w-full"
+                      data-testid="input-vrm"
                     />
                   </div>
 
@@ -191,6 +383,7 @@ export default function PenaltySearchPage() {
                     onClick={handleSearch}
                     disabled={isFetching}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
+                    data-testid="button-search"
                   >
                     {isFetching ? (
                       <div className="flex items-center space-x-2">
@@ -205,6 +398,42 @@ export default function PenaltySearchPage() {
                     )}
                   </Button>
                 </div>
+
+                {/* Enhanced Error Display */}
+                {searchError && (
+                  <Card className="border-l-4 border-l-red-500 bg-red-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-3">
+                        <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-red-800 mb-1">Search Error</h4>
+                          <p className="text-sm text-red-700">{searchError}</p>
+                          <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                            <Button
+                              onClick={handleRetrySearch}
+                              disabled={isFetching}
+                              size="sm"
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                              data-testid="button-retry-search"
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Retry Search
+                            </Button>
+                            <Button
+                              onClick={() => setSearchError(null)}
+                              size="sm"
+                              variant="outline"
+                              className="border-red-300 text-red-700 hover:bg-red-50"
+                              data-testid="button-dismiss-error"
+                            >
+                              Dismiss
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Search Results */}
                 {searchResults && searchResults.length > 0 && (
@@ -248,6 +477,7 @@ export default function PenaltySearchPage() {
                           <Button
                             onClick={() => handleSelectPenalty(penalty)}
                             className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white"
+                            data-testid="button-pay-penalty"
                           >
                             Pay This Penalty in Instalments
                           </Button>
@@ -257,10 +487,25 @@ export default function PenaltySearchPage() {
                   </div>
                 )}
 
-                {searchResults && searchResults.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">No penalties found matching your search criteria.</p>
-                  </div>
+                {searchResults && searchResults.length === 0 && hasSearched && !searchError && (
+                  <Card className="border-l-4 border-l-yellow-500 bg-yellow-50">
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-3">
+                        <Search className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-yellow-800 mb-1">No Results Found</h4>
+                          <p className="text-sm text-yellow-700 mb-3">
+                            No penalties found matching your search criteria. Please verify your details and try again.
+                          </p>
+                          <div className="text-xs text-yellow-600 space-y-1">
+                            <p>• Check your parking charge number is entered correctly</p>
+                            <p>• Verify your vehicle registration matches exactly</p>
+                            <p>• Try using just one search field if both are not working</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </>
             ) : (
