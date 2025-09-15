@@ -52,4 +52,4 @@ jobs:
           app-name: 'pcn-payment-portal'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C9F97BE7AC234685BA0A3200CD82110C }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_477BDEA341C2470FBCF6F4CB1D2587AD }}
