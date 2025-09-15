@@ -371,7 +371,7 @@ export class AzureStorageService {
           });
         }
       }
-      //
+      
       return results;
     } catch (error) {
       console.error('Failed to search Excel file:', error);
