@@ -252,9 +252,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let domainURL =
         process.env.CUSTOM_DOMAIN_URL ||
         (process.env.WEBSITE_HOSTNAME && `https://${process.env.WEBSITE_HOSTNAME}`) ||
-        (process.env.REPL_SLUG && process.env.REPL_OWNER && `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`) ||
         process.env.WEBSITE_URL ||
-        'http://localhost:5000';
+        'https://pcn-payment-portal.azurewebsites.net';
+
+      console.log(`Creating Stripe checkout session with domain: ${domainURL}`);
 
       // Create subscription schedule directly instead of using checkout for subscriptions
       const subscriptionSchedule = await stripe.subscriptionSchedules.create({
