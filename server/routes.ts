@@ -13,7 +13,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
 // Webhook secret is optional for development
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-07-30.basil",
+});
 
 // Configure multer for file uploads
 const upload = multer({
@@ -371,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         },
         success_url: `${domainURL}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${domainURL}/`,
+        cancel_url: `${domainURL}/payment?pcn=${pcnNumber}&vehicle=${vehicleRegistration}&amount=${penaltyAmount}`,
         metadata: {
           customerId: customer.id,
           priceId: price.id,
@@ -380,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      res.json({ sessionId: session.id, url: session.url, customerId: customer.id });
+      res.json({ url: session.url, customerId: customer.id });
 
     } catch (error: any) {
       console.error('Error creating checkout session:', error);

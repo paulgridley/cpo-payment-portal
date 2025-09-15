@@ -1,5 +1,4 @@
 import { BlobServiceClient, StorageSharedKeyCredential, ContainerClient } from '@azure/storage-blob';
-import { DefaultAzureCredential } from '@azure/identity';
 import * as XLSX from 'xlsx';
 import { storage } from './storage';
 import { InsertPenalty } from '@shared/schema';
@@ -16,31 +15,18 @@ export class AzureStorageService {
   constructor(connectionString?: string) {
     try {
       if (connectionString) {
-        // Explicit connection string provided
-        console.log('Initializing Azure Storage with connection string...');
         this.blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
         this.isAvailable = true;
-        console.log('Azure Storage service initialized with connection string');
       } else {
-        // Check for connection string environment variable first (for development)
-        const envConnectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
-        if (envConnectionString) {
-          console.log('Initializing Azure Storage with connection string from environment...');
-          this.blobServiceClient = BlobServiceClient.fromConnectionString(envConnectionString);
-          this.isAvailable = true;
-          console.log('Azure Storage service initialized with connection string from environment');
-        } else {
-          // Use DefaultAzureCredential for managed identity authentication (production)
-          console.log('Initializing Azure Storage with DefaultAzureCredential (managed identity)...');
-          const credential = new DefaultAzureCredential();
-          const accountUrl = `https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net`;
-          
-          this.blobServiceClient = new BlobServiceClient(accountUrl, credential);
-          
-          // Test the credential by attempting a simple operation
-          this.isAvailable = true;
-          console.log(`Azure Storage service initialized with managed identity for account: ${STORAGE_ACCOUNT_NAME}`);
+        // Use Azure credentials for authentication (requires AZURE_STORAGE_CONNECTION_STRING env var)
+        const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connStr) {
+          console.warn('AZURE_STORAGE_CONNECTION_STRING environment variable not found. Azure Storage will be unavailable.');
+          this.isAvailable = false;
+          return;
         }
+        this.blobServiceClient = BlobServiceClient.fromConnectionString(connStr);
+        this.isAvailable = true;
       }
       
       if (this.blobServiceClient) {
@@ -49,10 +35,6 @@ export class AzureStorageService {
       }
     } catch (error) {
       console.error('Failed to initialize Azure Storage service:', error);
-      if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
-        console.error('For managed identity: Ensure the identity has Storage Blob Data Contributor role on the storage account');
-        console.error('For development: Set AZURE_STORAGE_CONNECTION_STRING environment variable or run "az login"');
-      }
       this.isAvailable = false;
     }
   }
@@ -64,11 +46,7 @@ export class AzureStorageService {
 
   // Helper method to throw storage unavailable error
   private throwStorageUnavailableError(): never {
-    const connectionStringExists = !!process.env.AZURE_STORAGE_CONNECTION_STRING;
-    const errorMessage = connectionStringExists 
-      ? 'Azure Storage is not available. Please check your connection string configuration.'
-      : 'Azure Storage is not available. For managed identity: ensure proper permissions. For development: set AZURE_STORAGE_CONNECTION_STRING or run "az login".';
-    throw new Error(errorMessage);
+    throw new Error('Azure Storage is not available. Please check your AZURE_STORAGE_CONNECTION_STRING environment variable.');
   }
 
   // Ensure the container exists
@@ -81,11 +59,6 @@ export class AzureStorageService {
       console.log(`Azure container '${STORAGE_CONTAINER_NAME}' ensured to exist`);
     } catch (error) {
       console.error('Failed to ensure Azure container exists:', error);
-      // Check if this is an authentication error
-      if (error instanceof Error && error.message.includes('authentication')) {
-        console.error('Authentication failed - Azure Storage will be marked as unavailable');
-        this.isAvailable = false;
-      }
       // Don't throw here - the container might already exist and we just don't have permissions to create
     }
   }
