@@ -249,13 +249,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         product: product.id,
       });
 
-      let domainURL =
-        process.env.CUSTOM_DOMAIN_URL ||
-        (process.env.WEBSITE_HOSTNAME && `https://${process.env.WEBSITE_HOSTNAME}`) ||
-        process.env.WEBSITE_URL ||
-        'https://pcn-payment-portal.azurewebsites.net';
+      // For Azure deployments, use WEBSITE_HOSTNAME if available
+      let domainURL = process.env.CUSTOM_DOMAIN_URL;
+      
+      if (!domainURL && process.env.WEBSITE_HOSTNAME) {
+        domainURL = `https://${process.env.WEBSITE_HOSTNAME}`;
+      }
+      
+      if (!domainURL && process.env.WEBSITE_URL) {
+        domainURL = process.env.WEBSITE_URL;
+      }
+      
+      // Fallback - update this to match your actual Azure app name
+      if (!domainURL) {
+        domainURL = 'https://pcn-payment-portal.azurewebsites.net';
+      }
 
       console.log(`Creating Stripe checkout session with domain: ${domainURL}`);
+      console.log('Environment variables:');
+      console.log(`- CUSTOM_DOMAIN_URL: ${process.env.CUSTOM_DOMAIN_URL}`);
+      console.log(`- WEBSITE_HOSTNAME: ${process.env.WEBSITE_HOSTNAME}`);
+      console.log(`- WEBSITE_URL: ${process.env.WEBSITE_URL}`);
 
       // Create subscription schedule directly instead of using checkout for subscriptions
       const subscriptionSchedule = await stripe.subscriptionSchedules.create({
@@ -574,5 +588,3 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   return httpServer;
 }
-
-//routes
