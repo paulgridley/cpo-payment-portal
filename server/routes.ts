@@ -208,6 +208,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/create-checkout-session", async (req, res) => {
+    const startTime = Date.now();
+    console.log('Starting checkout session creation...');
+    
     try {
       // Validate request body
       const validationResult = checkoutSessionSchema.safeParse(req.body);
@@ -260,9 +263,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         domainURL = process.env.WEBSITE_URL;
       }
       
-      // Fallback - update this to match your actual Azure app name
+      // Fallback - use the request host header if available
+      if (!domainURL && req.headers.host) {
+        domainURL = `https://${req.headers.host}`;
+      }
+      
+      // Final fallback
       if (!domainURL) {
-        domainURL = 'https://pcn-payment-portal.azurewebsites.net';
+        domainURL = 'https://cpo-payment-portal.azurewebsites.net';
       }
 
       console.log(`Creating Stripe checkout session with domain: ${domainURL}`);
@@ -270,6 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`- CUSTOM_DOMAIN_URL: ${process.env.CUSTOM_DOMAIN_URL}`);
       console.log(`- WEBSITE_HOSTNAME: ${process.env.WEBSITE_HOSTNAME}`);
       console.log(`- WEBSITE_URL: ${process.env.WEBSITE_URL}`);
+      console.log(`- Request Host: ${req.headers.host}`);
 
       // Create subscription schedule directly instead of using checkout for subscriptions
       const subscriptionSchedule = await stripe.subscriptionSchedules.create({
@@ -394,11 +403,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ Checkout session created successfully in ${totalTime}ms`);
+      console.log(`Session URL: ${session.url}`);
+      
       res.json({ url: session.url, customerId: customer.id });
 
     } catch (error: any) {
-      console.error('Error creating checkout session:', error);
-      res.status(400).json({ error: error.message });
+      const totalTime = Date.now() - startTime;
+      console.error(`❌ Error creating checkout session after ${totalTime}ms:`, error);
+      console.error('Error details:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        param: error.param
+      });
+      res.status(400).json({ 
+        error: error.message,
+        details: error.type || 'Unknown error type'
+      });
     }
   });
 
