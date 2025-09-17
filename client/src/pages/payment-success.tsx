@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, ArrowLeft, X } from "lucide-react";
+import { CheckCircle, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -25,18 +24,8 @@ interface CheckoutSession {
 }
 
 export default function PaymentSuccess() {
-  const [isPopup, setIsPopup] = useState(false);
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session_id');
-
-  // Detect if we're in a popup window
-  useEffect(() => {
-    setIsPopup(window.opener !== null);
-  }, []);
-
-  const handleCloseWindow = () => {
-    window.close();
-  };
 
   const { data: session } = useQuery({
     queryKey: ['/api/checkout-session', sessionId],
@@ -130,22 +119,12 @@ export default function PaymentSuccess() {
               </div>
             </div>
 
-            {isPopup ? (
-              <Button 
-                onClick={handleCloseWindow}
-                className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700"
-              >
-                <X className="w-4 h-4" />
-                <span>Close Window</span>
+            <Link href="/">
+              <Button className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700">
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Portal</span>
               </Button>
-            ) : (
-              <Link href="/">
-                <Button className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700">
-                  <ArrowLeft className="w-4 h-4" />
-                  <span>Return to Portal</span>
-                </Button>
-              </Link>
-            )}
+            </Link>
           </CardContent>
         </Card>
       </div>

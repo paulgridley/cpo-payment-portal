@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import PaymentPortal from "@/pages/payment-portal";
 import PaymentSuccess from "@/pages/payment-success";
 import PaymentPage from "@/pages/payment";
-import PenaltySearchPage from "@/pages/penalty-search";
 import Bookmarklet from "@/pages/bookmarklet";
 import NotFound from "@/pages/not-found";
 
@@ -15,7 +14,6 @@ function Router() {
     <Switch>
       <Route path="/" component={PaymentPortal} />
       <Route path="/payment" component={PaymentPage} />
-      <Route path="/penalty-search" component={PenaltySearchPage} />
       <Route path="/payment-success" component={PaymentSuccess} />
       <Route path="/tools" component={Bookmarklet} />
       <Route component={NotFound} />

@@ -10,10 +10,10 @@ import { Car, Lock, CreditCard, CheckCircle, ArrowRight, Phone, HelpCircle, Home
 
 export default function PaymentPortal() {
   const [formData, setFormData] = useState({
-    ticketNo: '',
-    vrm: '',
+    pcnNumber: '',
+    vehicleRegistration: '',
     email: '',
-    previousOutstandingAmount: 60
+    penaltyAmount: 90
   });
   
   // Extract URL parameters on component mount
@@ -27,9 +27,9 @@ export default function PaymentPortal() {
     if (pcnNumber || vehicleReg || amount || email) {
       setFormData(prev => ({
         ...prev,
-        ...(pcnNumber && { ticketNo: pcnNumber }),
-        ...(vehicleReg && { vrm: vehicleReg.toUpperCase() }),
-        ...(amount && { previousOutstandingAmount: parseFloat(amount) || 60 }),
+        ...(pcnNumber && { pcnNumber }),
+        ...(vehicleReg && { vehicleRegistration: vehicleReg.toUpperCase() }),
+        ...(amount && { penaltyAmount: parseFloat(amount) || 90 }),
         ...(email && { email })
       }));
     }
@@ -41,9 +41,9 @@ export default function PaymentPortal() {
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: field === 'vrm' 
+      [field]: field === 'vehicleRegistration' 
         ? value.toUpperCase().replace(/[^A-Z0-9]/g, '') 
-        : field === 'previousOutstandingAmount' 
+        : field === 'penaltyAmount' 
         ? parseFloat(value) || 0
         : value
     }));
@@ -52,14 +52,29 @@ export default function PaymentPortal() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Always open the penalty search popup - no validation required
-    const popupUrl = `/penalty-search`;
+    if (!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in PCN number, vehicle registration and penalty amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Open payment popup with URL parameters
+    const params = new URLSearchParams({
+      pcn: formData.pcnNumber,
+      vehicle: formData.vehicleRegistration,
+      amount: formData.penaltyAmount.toString()
+    });
+    
+    const popupUrl = `/payment?${params.toString()}`;
     
     // Open popup window
     const popup = window.open(
       popupUrl,
-      'penalty-search-popup',
-      'width=800,height=800,scrollbars=yes,resizable=yes,status=yes'
+      'payment-popup',
+      'width=600,height=700,scrollbars=yes,resizable=yes,status=yes'
     );
     
     if (!popup) {
@@ -134,9 +149,10 @@ export default function PaymentPortal() {
             </div>
             <Button 
               onClick={handleFormSubmit}
-              className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg font-semibold"
+              disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
+              className="bg-green-500 hover:bg-green-600 text-white px-6 py-2"
             >
-              Pay in Instalments
+              Pay Now
             </Button>
           </div>
         </div>
@@ -148,23 +164,90 @@ export default function PaymentPortal() {
           {/* Main Form */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg p-8 shadow-sm">
-              {/* External Appeal/Payment Form */}
+              <h2 className="text-2xl font-medium text-gray-900 mb-2">
+                Appeal or Pay Your Parking Charge Notice Online
+              </h2>
+              <p className="text-gray-600 mb-8">
+                Enter your details and choose an option below to proceed
+              </p>
+
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-2">
+                    Parking Charge Number
+                  </Label>
+                  <Input
+                    data-testid="input-pcn-number"
+                    type="text"
+                    placeholder="Enter your parking charge number"
+                    value={formData.pcnNumber}
+                    onChange={(e) => handleInputChange('pcnNumber', e.target.value)}
+                    className="w-full"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vehicle Registration
+                  </Label>
+                  <Input
+                    data-testid="input-vehicle-registration"
+                    type="text"
+                    placeholder="Enter your vehicle registration"
+                    value={formData.vehicleRegistration}
+                    onChange={(e) => handleInputChange('vehicleRegistration', e.target.value)}
+                    className="w-full"
+                    required
+                  />
+                </div>
+              </div>
+
+
+
               <div className="mb-8">
-                <iframe 
-                  id="zp-widget" 
-                  src="https://civilparking.zatappeal.com/" 
-                  frameBorder="0" 
-                  width="100%" 
-                  style={{
-                    width: '100%',
-                    height: '900px',
-                    border: '1px solid #efefef',
-                    position: 'relative'
-                  }}
-                  title="Appeal or Pay Your Parking Charge Notice"
+                <Label className="block text-sm font-medium text-gray-700 mb-2">
+                  Penalty Amount (£)
+                </Label>
+                <Input
+                  data-testid="input-penalty-amount"
+                  type="number"
+                  placeholder="90"
+                  value={formData.penaltyAmount}
+                  onChange={(e) => handleInputChange('penaltyAmount', e.target.value)}
+                  className="w-full max-w-xs"
+                  min="1"
+                  step="0.01"
+                  required
                 />
               </div>
 
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <Button 
+                  data-testid="button-appeal"
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Appeal
+                </Button>
+                <Button 
+                  data-testid="button-transfer"
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Transfer of Liability
+                </Button>
+                <Button 
+                  data-testid="button-pay-online"
+                  onClick={handleFormSubmit}
+                  disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
+                  className="bg-gray-500 hover:bg-gray-600 text-white px-8 py-3"
+                  type="button"
+                >
+                  Pay Online
+                </Button>
+              </div>
 
 
 
@@ -173,7 +256,8 @@ export default function PaymentPortal() {
                 <Button 
                   data-testid="button-pay-installments"
                   type="submit" 
-                  className="bg-green-500 hover:bg-green-600 text-white px-12 py-4 text-xl font-bold w-full max-w-md mx-auto"
+                  disabled={!formData.pcnNumber || !formData.vehicleRegistration || !formData.penaltyAmount || formData.penaltyAmount <= 0}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 font-medium"
                 >
                   Pay in Instalments
                 </Button>
@@ -209,20 +293,20 @@ export default function PaymentPortal() {
                   <div className="space-y-2 text-sm text-blue-800">
                     <div className="flex justify-between">
                       <span>Payment 1 (Today):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment 2 ({payment2}):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Payment 3 ({payment3}):</span>
-                      <span>£{(formData.previousOutstandingAmount / 3).toFixed(2)}</span>
+                      <span>£{(formData.penaltyAmount / 3).toFixed(2)}</span>
                     </div>
                     <hr className="border-blue-200" />
                     <div className="flex justify-between font-medium">
                       <span>Total:</span>
-                      <span>£{formData.previousOutstandingAmount.toFixed(2)}</span>
+                      <span>£{formData.penaltyAmount.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
